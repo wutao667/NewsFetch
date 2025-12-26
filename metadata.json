@@ -1,0 +1,7 @@
+{
+  "name": "Gemini News Navigator",
+  "description": "A high-performance web application that searches the latest 3 days of Google News via RSS, featuring AI-powered analysis using Gemini for quick insights.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
