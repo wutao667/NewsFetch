@@ -48,8 +48,10 @@ export default async function handler(req: Request) {
     // 解析 XML 中的 <item> 块
     const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
     
-    // 提取数据，将限制从 30 提高到 100
-    const items = itemMatches.slice(0, 100).map(itemXml => {
+    // 提取数据，将限制从 100 提高到 300
+    // 注意：Google News RSS 源本身返回的数量可能有限，通常在 100 条左右，
+    // 设置为 300 可以确保获取该源提供的所有可用结果。
+    const items = itemMatches.slice(0, 300).map(itemXml => {
       const title = extract(itemXml, /<title>(.*?)<\/title>/);
       const link = extract(itemXml, /<link>(.*?)<\/link>/);
       const pubDate = extract(itemXml, /<pubDate>(.*?)<\/pubDate>/);

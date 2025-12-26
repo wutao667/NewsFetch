@@ -77,9 +77,19 @@ const App: React.FC = () => {
     });
   };
 
+  const deleteFromHistory = (query: string) => {
+    setHistory(prev => {
+      const newHistory = prev.filter(q => q !== query);
+      localStorage.setItem('gemini_news_history', JSON.stringify(newHistory));
+      return newHistory;
+    });
+  };
+
   const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem('gemini_news_history');
+    if (window.confirm('确定要清空所有搜索历史吗？')) {
+      setHistory([]);
+      localStorage.removeItem('gemini_news_history');
+    }
   };
 
   const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
@@ -203,13 +213,29 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
                   {history.map((q, idx) => (
-                    <button
+                    <div
                       key={idx}
-                      onClick={() => handleSearch(q, state.timeRange)}
-                      className="px-4 py-1.5 bg-white border border-gray-100 text-gray-600 text-sm rounded-full shadow-sm hover:border-blue-200 hover:text-blue-600 transition-all active:scale-95"
+                      className="group flex items-center bg-white border border-gray-100 rounded-full shadow-sm hover:border-blue-200 transition-all"
                     >
-                      {q}
-                    </button>
+                      <button
+                        onClick={() => handleSearch(q, state.timeRange)}
+                        className="pl-4 pr-2 py-1.5 text-gray-600 text-sm hover:text-blue-600 transition-all font-medium"
+                      >
+                        {q}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`确定要从历史记录中删除 "${q}" 吗？`)) {
+                            deleteFromHistory(q);
+                          }
+                        }}
+                        className="pr-3 pl-1 py-1.5 text-gray-300 hover:text-red-500 transition-colors"
+                        title="删除此记录"
+                      >
+                        <i className="fas fa-times text-[10px]"></i>
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
