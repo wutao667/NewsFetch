@@ -15,4 +15,4 @@ export interface SearchState {
   isSummarizing: boolean;
 }
 
-export type View = 'home' | 'results';
+export type View = 'home' | 'results' | 'debug';

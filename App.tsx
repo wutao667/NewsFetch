@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SearchBox } from './components/SearchBox';
 import { NewsTable } from './components/NewsTable';
+import { DebugView } from './components/DebugView';
 import { SearchState, View } from './types';
 import { fetchGoogleNews } from './services/newsService';
 import { generateNewsSummary } from './services/geminiService';
@@ -56,6 +57,10 @@ const App: React.FC = () => {
     setState(prev => ({ ...prev, results: [], error: null, summary: null }));
   };
 
+  const openDebug = () => {
+    setView('debug');
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Navigation Header */}
@@ -82,7 +87,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main className="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {view === 'home' ? (
+        {view === 'home' && (
           <div className="max-w-4xl mx-auto text-center mt-20">
             <h2 className="text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
               洞察全球，<br />
@@ -111,7 +116,9 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : (
+        )}
+
+        {view === 'results' && (
           <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -192,12 +199,22 @@ const App: React.FC = () => {
             )}
           </div>
         )}
+
+        {view === 'debug' && (
+          <DebugView onBack={goBack} />
+        )}
       </main>
 
       {/* Footer */}
       <footer className="bg-gray-50 border-t border-gray-100 py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 text-center text-gray-400 text-sm">
-          <p>© 2024 Gemini News Navigator. 基于 Vercel 后端中转获取。</p>
+        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-4">
+          <p className="text-gray-400 text-sm">© 2024 Gemini News Navigator. 基于 Vercel 后端中转获取。</p>
+          <button 
+            onClick={openDebug}
+            className="text-gray-300 hover:text-blue-500 transition-colors text-xs flex items-center gap-1"
+          >
+            <i className="fas fa-bug"></i> 开发者诊断模式
+          </button>
         </div>
       </footer>
     </div>
