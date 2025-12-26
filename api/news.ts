@@ -48,8 +48,8 @@ export default async function handler(req: Request) {
     // 解析 XML 中的 <item> 块
     const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
     
-    // 提取数据并直接返回，不再进行 URL 追踪
-    const items = itemMatches.slice(0, 30).map(itemXml => {
+    // 提取数据，将限制从 30 提高到 100
+    const items = itemMatches.slice(0, 100).map(itemXml => {
       const title = extract(itemXml, /<title>(.*?)<\/title>/);
       const link = extract(itemXml, /<link>(.*?)<\/link>/);
       const pubDate = extract(itemXml, /<pubDate>(.*?)<\/pubDate>/);
