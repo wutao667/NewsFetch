@@ -1,4 +1,6 @@
 
+export type TimeRange = '1d' | '3d' | '7d' | '30d';
+
 export interface NewsItem {
   title: string;
   link: string;
@@ -8,6 +10,7 @@ export interface NewsItem {
 
 export interface SearchState {
   query: string;
+  timeRange: TimeRange;
   results: NewsItem[];
   isLoading: boolean;
   error: string | null;

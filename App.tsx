@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { SearchBox } from './components/SearchBox';
 import { NewsTable } from './components/NewsTable';
 import { DebugView } from './components/DebugView';
-import { SearchState, View } from './types';
+import { SearchState, View, TimeRange } from './types';
 import { fetchGoogleNews } from './services/newsService';
 import { generateNewsSummary } from './services/geminiService';
 
@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
   const [state, setState] = useState<SearchState>({
     query: '',
+    timeRange: '3d',
     results: [],
     isLoading: false,
     error: null,
@@ -18,21 +19,28 @@ const App: React.FC = () => {
     isSummarizing: false,
   });
 
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
     // 重置状态并进入加载页
-    setState(prev => ({ ...prev, query, isLoading: true, error: null, summary: null }));
+    setState(prev => ({ 
+      ...prev, 
+      query, 
+      timeRange, 
+      isLoading: true, 
+      error: null, 
+      summary: null 
+    }));
     setView('results');
     
     try {
       // 1. 获取新闻列表
-      const news = await fetchGoogleNews(query);
+      const news = await fetchGoogleNews(query, timeRange);
       
       // 更新新闻结果
       setState(prev => ({ 
         ...prev, 
         results: news, 
         isLoading: false, 
-        error: news.length === 0 ? '最近3天内没有关于该话题的新闻，请尝试其他关键词。' : null 
+        error: news.length === 0 ? `最近 ${timeRange === '1d' ? '1 天' : timeRange === '3d' ? '3 天' : timeRange === '7d' ? '7 天' : '30 天'} 内没有关于该话题的新闻，请尝试其他关键词或扩大范围。` : null 
       }));
 
       // 2. 如果有结果，自动触发 AI 总结
@@ -94,8 +102,13 @@ const App: React.FC = () => {
             </h1>
           </div>
           {view === 'results' && (
-            <div className="hidden md:block w-96">
-              <SearchBox onSearch={handleSearch} isLoading={state.isLoading} />
+            <div className="hidden md:block w-[450px]">
+              <SearchBox 
+                onSearch={handleSearch} 
+                isLoading={state.isLoading} 
+                initialValue={state.query} 
+                initialTimeRange={state.timeRange}
+              />
             </div>
           )}
         </div>
@@ -107,23 +120,23 @@ const App: React.FC = () => {
           <div className="max-w-4xl mx-auto text-center mt-20">
             <h2 className="text-5xl font-extrabold text-gray-900 mb-6 leading-tight">
               洞察全球，<br />
-              掌握<span className="text-blue-600">最近 72 小时</span>的热点。
+              掌握<span className="text-blue-600">即时动态</span>的热点。
             </h2>
             <p className="text-gray-500 text-xl mb-12 max-w-2xl mx-auto">
-              即时获取 Google News 最新资讯，结合 Gemini AI 的强大分析能力，为您提取核心要点。
+              即时获取 Google News 资讯，支持自定义时间跨度。结合 Gemini AI 深度分析，为您提取核心要点。
             </p>
             <SearchBox onSearch={handleSearch} isLoading={state.isLoading} />
             
             <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
               <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <i className="fas fa-clock text-blue-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2">时效性优先</h3>
-                <p className="text-gray-500">仅罗列过去3天内的新闻，确保您看到的是最新动态。</p>
+                <i className="fas fa-calendar-alt text-blue-500 text-2xl mb-4"></i>
+                <h3 className="font-bold text-lg mb-2">弹性时效</h3>
+                <p className="text-gray-500">从 24 小时到 30 天，自由掌控资讯的时间跨度。</p>
               </div>
               <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <i className="fas fa-table text-green-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2">清爽表格</h3>
-                <p className="text-gray-500">结构化展示标题、时间和来源，一眼扫过核心信息。</p>
+                <h3 className="font-bold text-lg mb-2">智能排序</h3>
+                <p className="text-gray-500">搜索结果默认按时间倒序排列，最新消息一目了然。</p>
               </div>
               <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <i className="fas fa-brain text-purple-500 text-2xl mb-4"></i>
@@ -150,7 +163,7 @@ const App: React.FC = () => {
                   </h2>
                   {!state.isLoading && state.results.length > 0 && (
                     <span className="text-lg font-medium text-gray-400">
-                      共 {state.results.length} 条
+                      共 {state.results.length} 条 (过去 {state.timeRange === '1d' ? '1天' : state.timeRange === '3d' ? '3天' : state.timeRange === '7d' ? '7天' : '30天'})
                     </span>
                   )}
                 </div>
@@ -160,7 +173,7 @@ const App: React.FC = () => {
                 <button
                   onClick={handleSummarize}
                   disabled={state.isSummarizing}
-                  className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-70"
+                  className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-70 shadow-sm"
                 >
                   {state.isSummarizing ? (
                     <><i className="fas fa-circle-notch fa-spin text-blue-500"></i> 处理中...</>
@@ -180,7 +193,7 @@ const App: React.FC = () => {
                 <p className="text-sm opacity-90">{state.error}</p>
                 <div className="flex gap-4 mt-2">
                   <button 
-                    onClick={() => handleSearch(state.query)}
+                    onClick={() => handleSearch(state.query, state.timeRange)}
                     className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
                   >
                     重试搜索

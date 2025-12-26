@@ -34,19 +34,26 @@ export default async function handler(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
     
-    const titles = news.map((n: any) => `- ${n.title}`).join('\n');
+    // 包含发布时间的新闻列表，以便模型分析时间线
+    const newsContent = news.map((n: any) => `[发布时间: ${n.pubDate}] 标题: ${n.title}`).join('\n');
+    
     const prompt = `
-      以下是关于“${topic}”的最新搜索结果。请对这些新闻进行简明扼要的总结（300字以内），指出最主要的趋势或热点话题。
+      请分析关于“${topic}”的最新搜索结果。
       
-      新闻列表：
-      ${titles}
+      以下是包含时间戳的新闻列表：
+      ${newsContent}
+
+      请完成以下任务（350字以内，使用中文）：
+      1. 核心总结：简述这一话题目前的主要动态。
+      2. 时间线演变分析：参考新闻的发布时间，分析舆论或报道焦点随时间的变化情况（例如：从早期的XX关注点转移到了最新的XX动向）。
+      3. 关键趋势：指出目前该话题最值得关注的一个趋势或潜在走向。
     `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
       config: {
-        systemInstruction: "你是一个资深新闻编辑，擅长从多个标题中提取核心信息并以中文进行简洁总结。",
+        systemInstruction: "你是一个资深新闻数据分析师，擅长从带有时间戳的碎片化新闻中提取核心信息，并分析舆论随时间推移的演变脉络。请以专业、深刻且简洁的中文进行回答。",
       }
     });
 

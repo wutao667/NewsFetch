@@ -1,13 +1,15 @@
 
-import { NewsItem } from '../types';
+import { NewsItem, TimeRange } from '../types';
 
 /**
  * 通过 Vercel API Route 后端获取新闻
- * 后端已处理了 URL 重定向，此处直接接收解析好的 JSON
+ * @param query 搜索关键词
+ * @param timeRange 时效性 (1d, 3d, 7d, 30d)
  */
-export const fetchGoogleNews = async (query: string): Promise<NewsItem[]> => {
+export const fetchGoogleNews = async (query: string, timeRange: TimeRange = '3d'): Promise<NewsItem[]> => {
   try {
-    const fullQuery = `${query} when:3d`;
+    // 根据用户选择构建 Google News 搜索语法，例如 "AI when:7d"
+    const fullQuery = `${query} when:${timeRange}`;
     const apiUrl = `/api/news?q=${encodeURIComponent(fullQuery)}`;
     
     const response = await fetch(apiUrl);
