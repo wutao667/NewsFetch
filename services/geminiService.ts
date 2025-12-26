@@ -2,8 +2,25 @@
 import { GoogleGenAI } from "@google/genai";
 import { NewsItem } from "../types";
 
+// 安全获取 API Key
+const getApiKey = () => {
+  try {
+    // 优先从 process.env 获取，如果 process 不存在则 fallback
+    return (typeof process !== 'undefined' && process.env?.API_KEY) || (window as any)._ENV_?.API_KEY || "";
+  } catch {
+    return "";
+  }
+};
+
 export const generateNewsSummary = async (news: NewsItem[], topic: string): Promise<string> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    console.error("API_KEY is missing. Please set it in Vercel Environment Variables.");
+    return "AI 总结不可用：缺少 API Key 配置。";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   
   const titles = news.map(n => `- ${n.title}`).join('\n');
   const prompt = `
@@ -23,8 +40,8 @@ export const generateNewsSummary = async (news: NewsItem[], topic: string): Prom
     });
     
     return response.text || "无法生成总结。";
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Error:", error);
-    return "AI 总结暂时不可用。";
+    return `AI 总结失败: ${error.message || '未知错误'}`;
   }
 };
