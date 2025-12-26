@@ -19,17 +19,33 @@ const App: React.FC = () => {
   });
 
   const handleSearch = useCallback(async (query: string) => {
+    // 重置状态并进入加载页
     setState(prev => ({ ...prev, query, isLoading: true, error: null, summary: null }));
     setView('results');
     
     try {
+      // 1. 获取新闻列表
       const news = await fetchGoogleNews(query);
+      
+      // 更新新闻结果
       setState(prev => ({ 
         ...prev, 
         results: news, 
         isLoading: false, 
         error: news.length === 0 ? '最近3天内没有关于该话题的新闻，请尝试其他关键词。' : null 
       }));
+
+      // 2. 如果有结果，自动触发 AI 总结
+      if (news.length > 0) {
+        setState(prev => ({ ...prev, isSummarizing: true }));
+        try {
+          const summaryText = await generateNewsSummary(news, query);
+          setState(prev => ({ ...prev, summary: summaryText, isSummarizing: false }));
+        } catch (summaryErr) {
+          console.error("Auto-summarize failed:", summaryErr);
+          setState(prev => ({ ...prev, isSummarizing: false }));
+        }
+      }
     } catch (err: any) {
       console.error(err);
       setState(prev => ({ 
@@ -43,7 +59,7 @@ const App: React.FC = () => {
   const handleSummarize = async () => {
     if (state.results.length === 0) return;
     
-    setState(prev => ({ ...prev, isSummarizing: true }));
+    setState(prev => ({ ...prev, isSummarizing: true, summary: null }));
     try {
       const summaryText = await generateNewsSummary(state.results, state.query);
       setState(prev => ({ ...prev, summary: summaryText, isSummarizing: false }));
@@ -111,8 +127,8 @@ const App: React.FC = () => {
               </div>
               <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
                 <i className="fas fa-brain text-purple-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2">AI 总结</h3>
-                <p className="text-gray-500">一键调用 Gemini 引擎，为您总结纷繁复杂的搜索结果。</p>
+                <h3 className="font-bold text-lg mb-2">AI 自动总结</h3>
+                <p className="text-gray-500">搜索完成后立即调用 Gemini 引擎，为您总结纷繁的信息。</p>
               </div>
             </div>
           </div>
@@ -128,21 +144,28 @@ const App: React.FC = () => {
                 >
                   <i className="fas fa-arrow-left mr-2"></i> 返回首页
                 </button>
-                <h2 className="text-3xl font-bold text-gray-900">
-                  搜索结果: <span className="text-blue-600">“{state.query}”</span>
-                </h2>
+                <div className="flex items-baseline gap-3">
+                  <h2 className="text-3xl font-bold text-gray-900">
+                    搜索结果: <span className="text-blue-600">“{state.query}”</span>
+                  </h2>
+                  {!state.isLoading && state.results.length > 0 && (
+                    <span className="text-lg font-medium text-gray-400">
+                      共 {state.results.length} 条
+                    </span>
+                  )}
+                </div>
               </div>
               
               {!state.isLoading && state.results.length > 0 && (
                 <button
                   onClick={handleSummarize}
                   disabled={state.isSummarizing}
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 shadow-lg shadow-blue-200 transition-all active:scale-95 disabled:opacity-70"
+                  className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-70"
                 >
                   {state.isSummarizing ? (
-                    <><i className="fas fa-circle-notch fa-spin"></i> AI 分析中...</>
+                    <><i className="fas fa-circle-notch fa-spin text-blue-500"></i> 处理中...</>
                   ) : (
-                    <><i className="fas fa-magic"></i> AI 总结此话题</>
+                    <><i className="fas fa-sync-alt"></i> 重新生成总结</>
                   )}
                 </button>
               )}
@@ -152,7 +175,7 @@ const App: React.FC = () => {
               <div className="p-6 bg-red-50 border border-red-200 text-red-900 rounded-2xl flex flex-col gap-4">
                 <div className="flex items-center gap-3">
                   <i className="fas fa-exclamation-triangle text-red-600 text-xl"></i>
-                  <span className="font-bold text-lg">请求失败</span>
+                  <span className="font-bold text-lg">无法加载结果</span>
                 </div>
                 <p className="text-sm opacity-90">{state.error}</p>
                 <div className="flex gap-4 mt-2">
@@ -172,17 +195,34 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {state.summary && (
-              <div className="p-8 bg-blue-50 border border-blue-100 rounded-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <i className="fas fa-brain text-8xl"></i>
+            {/* AI Summary Loading or Content */}
+            {(state.isSummarizing || state.summary) && (
+              <div className={`p-8 rounded-2xl border transition-all duration-500 ${state.isSummarizing ? 'bg-gray-50 border-gray-100 animate-pulse' : 'bg-blue-50 border-blue-100 shadow-sm'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className={`font-bold text-lg flex items-center gap-2 ${state.isSummarizing ? 'text-gray-400' : 'text-blue-900'}`}>
+                    <i className={`fas fa-sparkles ${state.isSummarizing ? 'text-gray-300' : 'text-blue-500'}`}></i> 
+                    {state.isSummarizing ? 'Gemini 正在为您深度分析...' : 'AI 洞察总结'}
+                  </h3>
+                  {state.isSummarizing && (
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-blue-900 font-bold text-lg mb-4 flex items-center gap-2">
-                  <i className="fas fa-sparkles text-blue-500"></i> AI 洞察总结
-                </h3>
-                <div className="text-blue-800 leading-relaxed whitespace-pre-line relative z-10">
-                  {state.summary}
-                </div>
+                
+                {state.summary ? (
+                  <div className="text-blue-800 leading-relaxed whitespace-pre-line relative z-10 text-lg">
+                    {state.summary}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="h-4 bg-gray-200 rounded w-full"></div>
+                    <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+                    <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -208,7 +248,7 @@ const App: React.FC = () => {
       {/* Footer */}
       <footer className="bg-gray-50 border-t border-gray-100 py-8 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-4">
-          <p className="text-gray-400 text-sm">© 2024 Gemini News Navigator. 基于 Vercel 后端中转获取。</p>
+          <p className="text-gray-400 text-sm">© 2024 Gemini News Navigator. AI 总结由 Google Gemini 3 提供支持。</p>
           <button 
             onClick={openDebug}
             className="text-gray-300 hover:text-blue-500 transition-colors text-xs flex items-center gap-1"

@@ -23,8 +23,20 @@ export const fetchGoogleNews = async (query: string): Promise<NewsItem[]> => {
       return [];
     }
 
-    // 在前端进行简单的格式化处理
-    return data.map((item: any) => {
+    // 1. 先进行初步映射并保留时间戳用于排序
+    const itemsWithTimestamp = data.map((item: any) => {
+      const date = new Date(item.pubDate);
+      return {
+        ...item,
+        timestamp: isNaN(date.getTime()) ? 0 : date.getTime()
+      };
+    });
+
+    // 2. 按照时间倒序排列（最新的在前）
+    itemsWithTimestamp.sort((a, b) => b.timestamp - a.timestamp);
+
+    // 3. 最终格式化为 NewsItem 类型
+    return itemsWithTimestamp.map((item: any) => {
       let fullTitle = item.title || '无标题';
       let sourceName = item.source || '';
 
@@ -33,19 +45,17 @@ export const fetchGoogleNews = async (query: string): Promise<NewsItem[]> => {
         fullTitle = fullTitle.substring(0, fullTitle.lastIndexOf(` - ${sourceName}`));
       }
 
-      // 格式化日期
+      // 格式化展示日期
       let formattedDate = item.pubDate;
-      try {
-        const d = new Date(item.pubDate);
-        if (!isNaN(d.getTime())) {
-          formattedDate = d.toLocaleString('zh-CN', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-          });
-        }
-      } catch (e) {}
+      const d = new Date(item.timestamp);
+      if (item.timestamp > 0) {
+        formattedDate = d.toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
 
       return {
         title: fullTitle,
