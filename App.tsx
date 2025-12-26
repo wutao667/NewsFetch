@@ -11,16 +11,12 @@ import { generateNewsSummary } from './services/geminiService';
  * 一个轻量级的组件，用于将 Markdown 格式（如 **bold**）转换为带有样式的 React 元素
  */
 const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
-  // 处理换行符，将文本分割为段落
   const paragraphs = text.split('\n');
 
   return (
     <div className="space-y-4 text-gray-800 leading-relaxed text-lg">
       {paragraphs.map((para, i) => {
         if (!para.trim()) return <div key={i} className="h-2"></div>;
-
-        // 处理加粗 **text**
-        // 同时也尝试匹配常见的标题模式，如 "1. 核心总结："
         const parts = para.split(/(\*\*.*?\*\*)/g);
         
         return (
@@ -28,10 +24,7 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
             {parts.map((part, j) => {
               if (part.startsWith('**') && part.endsWith('**')) {
                 const innerText = part.slice(2, -2);
-                
-                // 如果内容看起来像一个核心章节标题，赋予特殊颜色
                 const isHeading = /核心总结|时间线|演变分析|关键趋势|总结|分析/.test(innerText);
-                
                 return (
                   <strong 
                     key={j} 
@@ -52,6 +45,7 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
 
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
+  const [history, setHistory] = useState<string[]>([]);
   const [state, setState] = useState<SearchState>({
     query: '',
     timeRange: '3d',
@@ -61,6 +55,32 @@ const App: React.FC = () => {
     summary: null,
     isSummarizing: false,
   });
+
+  // 初始化时加载历史记录
+  useEffect(() => {
+    const savedHistory = localStorage.getItem('gemini_news_history');
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {
+        console.error("Failed to parse history", e);
+      }
+    }
+  }, []);
+
+  const saveToHistory = (query: string) => {
+    setHistory(prev => {
+      const filtered = prev.filter(q => q !== query);
+      const newHistory = [query, ...filtered].slice(0, 10);
+      localStorage.setItem('gemini_news_history', JSON.stringify(newHistory));
+      return newHistory;
+    });
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem('gemini_news_history');
+  };
 
   const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
     setState(prev => ({ 
@@ -72,6 +92,7 @@ const App: React.FC = () => {
       summary: null 
     }));
     setView('results');
+    saveToHistory(query);
     
     try {
       const news = await fetchGoogleNews(query, timeRange);
@@ -164,25 +185,35 @@ const App: React.FC = () => {
             <p className="text-gray-500 text-xl mb-12 max-w-2xl mx-auto">
               即时获取 Google News 资讯，支持自定义时间跨度。结合 Gemini AI 深度分析，为您提取核心要点。
             </p>
-            <SearchBox onSearch={handleSearch} isLoading={state.isLoading} />
             
-            <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-left">
-              <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <i className="fas fa-calendar-alt text-blue-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2 text-gray-800">弹性时效</h3>
-                <p className="text-gray-500">从 24 小时到 30 天，自由掌控资讯的时间跨度。</p>
+            <SearchBox onSearch={handleSearch} isLoading={state.isLoading} />
+
+            {/* 搜索历史记录 */}
+            {history.length > 0 && (
+              <div className="mt-8 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="flex items-center justify-center gap-4 mb-3">
+                  <span className="text-sm font-semibold text-gray-400 uppercase tracking-wider">最近搜索</span>
+                  <button 
+                    onClick={clearHistory}
+                    className="text-xs text-gray-300 hover:text-red-400 transition-colors"
+                    title="清空历史"
+                  >
+                    <i className="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {history.map((q, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSearch(q, state.timeRange)}
+                      className="px-4 py-1.5 bg-white border border-gray-100 text-gray-600 text-sm rounded-full shadow-sm hover:border-blue-200 hover:text-blue-600 transition-all active:scale-95"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <i className="fas fa-table text-green-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2 text-gray-800">智能排序</h3>
-                <p className="text-gray-500">搜索结果默认按时间倒序排列，最新消息一目了然。</p>
-              </div>
-              <div className="p-6 bg-white rounded-2xl border border-gray-100 shadow-sm">
-                <i className="fas fa-brain text-purple-500 text-2xl mb-4"></i>
-                <h3 className="font-bold text-lg mb-2 text-gray-800">AI 自动总结</h3>
-                <p className="text-gray-500">搜索完成后立即调用 Gemini 引擎，为您总结纷繁的信息。</p>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -250,7 +281,6 @@ const App: React.FC = () => {
             {/* AI Summary Loading or Content */}
             {(state.isSummarizing || state.summary) && (
               <div className={`relative p-8 rounded-3xl border transition-all duration-700 overflow-hidden ${state.isSummarizing ? 'bg-white border-gray-200 shadow-sm animate-pulse' : 'bg-white border-blue-100 shadow-xl shadow-blue-900/5'}`}>
-                {/* 装饰边条 */}
                 <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${state.isSummarizing ? 'bg-gray-200' : 'bg-blue-600'}`}></div>
                 
                 <div className="flex items-center justify-between mb-8 relative z-10">
