@@ -269,6 +269,17 @@ const App: React.FC = () => {
 
         {view === 'results' && (
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-10 animate-in fade-in duration-500">
+            {/* 移动端搜索框 (仅在非桌面端显示) */}
+            <div className="lg:hidden w-full mb-4">
+              <SearchBox 
+                onSearch={handleSearch} 
+                onTimeRangeChange={setActiveTimeRange}
+                isLoading={state.isLoading} 
+                initialValue={state.query} 
+                initialTimeRange={activeTimeRange}
+              />
+            </div>
+
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <button 
