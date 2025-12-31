@@ -1,5 +1,5 @@
 
-export type TimeRange = '1d' | '3d' | '7d' | '30d';
+export type TimeRange = '1d' | '3d' | '7d' | '30d' | '1y';
 
 export interface NewsItem {
   title: string;

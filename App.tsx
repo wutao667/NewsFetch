@@ -46,6 +46,10 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
   const [history, setHistory] = useState<string[]>([]);
+  
+  // 实时记录当前用户在界面上选中的时间范围（即使还未点击搜索按钮）
+  const [activeTimeRange, setActiveTimeRange] = useState<TimeRange>('3d');
+
   const [state, setState] = useState<SearchState>({
     query: '',
     timeRange: '3d',
@@ -92,7 +96,21 @@ const App: React.FC = () => {
     }
   };
 
+  const getTimeRangeLabel = (tr: TimeRange) => {
+    const map = {
+      '1d': '1 天',
+      '3d': '3 天',
+      '7d': '7 天',
+      '30d': '30 天',
+      '1y': '1 年'
+    };
+    return map[tr] || tr;
+  };
+
   const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
+    // 搜索时同步更新选中的时间范围
+    setActiveTimeRange(timeRange);
+    
     setState(prev => ({ 
       ...prev, 
       query, 
@@ -111,7 +129,7 @@ const App: React.FC = () => {
         ...prev, 
         results: news, 
         isLoading: false, 
-        error: news.length === 0 ? `最近 ${timeRange === '1d' ? '1 天' : timeRange === '3d' ? '3 天' : timeRange === '7d' ? '7 天' : '30 天'} 内没有关于该话题的新闻，请尝试其他关键词或扩大范围。` : null 
+        error: news.length === 0 ? `最近 ${getTimeRangeLabel(timeRange)} 内没有关于该话题的新闻，请尝试其他关键词或扩大范围。` : null 
       }));
 
       if (news.length > 0) {
@@ -175,9 +193,10 @@ const App: React.FC = () => {
             <div className="hidden lg:block w-[450px]">
               <SearchBox 
                 onSearch={handleSearch} 
+                onTimeRangeChange={setActiveTimeRange}
                 isLoading={state.isLoading} 
                 initialValue={state.query} 
-                initialTimeRange={state.timeRange}
+                initialTimeRange={activeTimeRange}
               />
             </div>
           )}
@@ -196,7 +215,12 @@ const App: React.FC = () => {
               即时获取 Google News 资讯，支持自定义时间跨度。结合 Gemini AI 深度分析，为您提取核心要点。
             </p>
             
-            <SearchBox onSearch={handleSearch} isLoading={state.isLoading} />
+            <SearchBox 
+              onSearch={handleSearch} 
+              onTimeRangeChange={setActiveTimeRange}
+              initialTimeRange={activeTimeRange}
+              isLoading={state.isLoading} 
+            />
 
             {/* 搜索历史记录 */}
             {history.length > 0 && (
@@ -218,7 +242,7 @@ const App: React.FC = () => {
                       className="group flex items-center bg-white border border-gray-100 rounded-full shadow-sm hover:border-blue-200 transition-all"
                     >
                       <button
-                        onClick={() => handleSearch(q, state.timeRange)}
+                        onClick={() => handleSearch(q, activeTimeRange)}
                         className="pl-3 pr-1.5 sm:pl-4 sm:pr-2 py-1 sm:py-1.5 text-gray-600 text-xs sm:text-sm hover:text-blue-600 transition-all font-medium"
                       >
                         {q}
@@ -274,7 +298,7 @@ const App: React.FC = () => {
                 </h2>
                 {!state.isLoading && state.results.length > 0 && (
                   <span className="text-sm sm:text-lg font-medium text-gray-400">
-                    共 {state.results.length} 条 (过去 {state.timeRange === '1d' ? '1天' : state.timeRange === '3d' ? '3天' : state.timeRange === '7d' ? '7天' : '30天'})
+                    共 {state.results.length} 条 (过去 {getTimeRangeLabel(state.timeRange)})
                   </span>
                 )}
               </div>

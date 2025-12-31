@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TimeRange } from '../types';
 
 interface SearchBoxProps {
   initialValue?: string;
   initialTimeRange?: TimeRange;
   onSearch: (query: string, timeRange: TimeRange) => void;
+  onTimeRangeChange?: (timeRange: TimeRange) => void;
   isLoading?: boolean;
 }
 
@@ -13,10 +14,16 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
   initialValue = '', 
   initialTimeRange = '3d', 
   onSearch, 
+  onTimeRangeChange,
   isLoading 
 }) => {
   const [query, setQuery] = useState(initialValue);
   const [timeRange, setTimeRange] = useState<TimeRange>(initialTimeRange);
+
+  // 当外部初始值改变时同步内部状态（例如点击返回首页）
+  useEffect(() => {
+    setTimeRange(initialTimeRange);
+  }, [initialTimeRange]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,11 +32,19 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
     }
   };
 
+  const handleTimeRangeClick = (value: TimeRange) => {
+    setTimeRange(value);
+    if (onTimeRangeChange) {
+      onTimeRangeChange(value);
+    }
+  };
+
   const timeOptions: { label: string; value: TimeRange }[] = [
     { label: '1天', value: '1d' },
     { label: '3天', value: '3d' },
     { label: '7天', value: '7d' },
     { label: '30天', value: '30d' },
+    { label: '1年', value: '1y' },
   ];
 
   return (
@@ -66,7 +81,7 @@ export const SearchBox: React.FC<SearchBoxProps> = ({
             <button
               key={opt.value}
               type="button"
-              onClick={() => setTimeRange(opt.value)}
+              onClick={() => handleTimeRangeClick(opt.value)}
               disabled={isLoading}
               className={`px-3 py-1 sm:px-4 sm:py-1.5 rounded-md sm:rounded-lg text-[10px] sm:text-sm font-medium transition-all whitespace-nowrap ${
                 timeRange === opt.value
