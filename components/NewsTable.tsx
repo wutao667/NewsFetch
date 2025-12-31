@@ -19,41 +19,47 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* 桌面端展示 (Table) */}
-      <div className="hidden md:block overflow-hidden bg-white rounded-xl shadow-sm border border-gray-100">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="hidden md:block overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100">
+        <table className="min-w-full divide-y divide-gray-100">
+          <thead className="bg-gray-50/50">
             <tr>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+              <th scope="col" className="px-4 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-12">
+                #
+              </th>
+              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
                 新闻标题
               </th>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-48">
+              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-48">
                 发布时间
               </th>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-32">
+              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-32">
                 来源
               </th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-white divide-y divide-gray-50">
             {items.map((item, index) => (
-              <tr key={index} className="hover:bg-blue-50 transition-colors">
+              <tr key={index} className="hover:bg-blue-50/30 transition-colors group">
+                <td className="px-4 py-5 text-sm font-bold text-blue-500/50">
+                   {index + 1}
+                </td>
                 <td className="px-6 py-5">
                   <a 
                     href={item.link} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="text-gray-900 font-medium hover:text-blue-600 transition-colors line-clamp-2"
+                    className="text-gray-900 font-semibold hover:text-blue-600 transition-colors line-clamp-2"
                   >
                     {item.title}
                   </a>
                 </td>
-                <td className="px-6 py-5 text-sm text-gray-500 whitespace-nowrap">
+                <td className="px-6 py-5 text-sm text-gray-400 whitespace-nowrap">
                   {item.pubDate}
                 </td>
                 <td className="px-6 py-5 text-sm">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-black bg-gray-100 text-gray-600 uppercase tracking-tighter">
                     {item.source}
                   </span>
                 </td>
@@ -64,22 +70,25 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
       </div>
 
       {/* 移动端展示 (Card List) */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-4">
         {items.map((item, index) => (
-          <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-2">
+          <div key={index} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3">
+            <div className="absolute top-0 left-0 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-br-lg shadow-sm">
+              #{index + 1}
+            </div>
             <a 
               href={item.link} 
               target="_blank" 
               rel="noopener noreferrer" 
-              className="text-gray-900 font-bold text-sm leading-snug hover:text-blue-600 active:text-blue-800 transition-colors line-clamp-3"
+              className="text-gray-900 font-bold text-base leading-snug hover:text-blue-600 active:text-blue-800 transition-colors line-clamp-3 pt-2"
             >
               {item.title}
             </a>
-            <div className="flex items-center justify-between mt-1">
-              <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md uppercase tracking-wide">
+            <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-1">
+              <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase">
                 {item.source}
               </span>
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-gray-400 font-medium">
                 {item.pubDate}
               </span>
             </div>

@@ -8,7 +8,7 @@ import { fetchGoogleNews } from './services/newsService';
 import { generateNewsSummary } from './services/geminiService';
 
 /**
- * 极简美化版格式化组件：将 Markdown 转化为纯净的 UI 元素
+ * 极简美化版格式化组件：支持渲染 [n] 引用标签
  */
 const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
   const lines = text.split('\n');
@@ -26,13 +26,10 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
           return <hr key={i} className="my-10 border-none h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />;
         }
 
-        // 3. 处理核心标题 (识别 # 标题 或 1. **标题** 形式)
-        // 匹配 # 标题 或 数字标题（如 1. **标题**）
+        // 3. 处理核心标题
         const headingMatch = trimmedLine.match(/^(#{1,4})\s+(.*)/) || trimmedLine.match(/^(\d+\.)\s+(.*)/);
-        
         if (headingMatch) {
           let content = headingMatch[2];
-          // 关键：剥离标题中可能存在的 ** 符号
           content = content.replace(/\*\*/g, '');
           
           return (
@@ -42,28 +39,28 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
                   {headingMatch[1].includes('#') ? '§' : headingMatch[1]}
                 </span>
                 <h3 className="font-extrabold text-gray-900 text-xl sm:text-2xl tracking-tight">
-                  {content}
+                  {renderTextWithCitations(content)}
                 </h3>
               </div>
             </div>
           );
         }
 
-        // 4. 处理无序列表 (- * +)
+        // 4. 处理无序列表
         const listMatch = trimmedLine.match(/^[\-\*\+]\s+(.*)/);
         if (listMatch) {
           return (
             <div key={i} className="flex gap-3 pl-2 sm:pl-5 group">
               <span className="text-blue-400 mt-2 text-xs transition-transform group-hover:scale-150">◆</span>
-              <span className="flex-1">{renderBoldText(listMatch[1])}</span>
+              <span className="flex-1">{renderTextWithCitations(listMatch[1])}</span>
             </div>
           );
         }
 
-        // 5. 处理普通段落与加粗内容
+        // 5. 处理普通段落
         return (
           <p key={i} className="relative pl-1">
-            {renderBoldText(line)}
+            {renderTextWithCitations(line)}
           </p>
         );
       })}
@@ -72,24 +69,48 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
 };
 
 /**
- * 辅助函数：渲染加粗文本（用于段落内部）
+ * 辅助函数：渲染包含引用 [n] 和加粗的文本
  */
-const renderBoldText = (text: string) => {
-  // 保持段落内部的加粗，但给予更柔和的颜色
-  const parts = text.split(/(\*\*.*?\*\*)/g);
-  return parts.map((part, j) => {
+const renderTextWithCitations = (text: string) => {
+  // 1. 先按加粗切分
+  const boldParts = text.split(/(\*\*.*?\*\*)/g);
+  
+  return boldParts.map((part, j) => {
+    let content = part;
+    let isBold = false;
+    
     if (part.startsWith('**') && part.endsWith('**')) {
-      const innerText = part.slice(2, -2);
+      content = part.slice(2, -2);
+      isBold = true;
+    }
+
+    // 2. 对切分后的每一部分进行引用识别 [n] 或 [n, m]
+    const citationParts = content.split(/(\[\d+(?:,\s*\d+)*\])/g);
+    
+    const rendered = citationParts.map((subPart, k) => {
+      const citeMatch = subPart.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
+      if (citeMatch) {
+        return (
+          <span 
+            key={k} 
+            className="inline-flex items-center justify-center mx-0.5 px-1.5 py-0 bg-blue-100 text-blue-700 text-[10px] sm:text-[12px] font-black rounded-sm align-top mt-1 hover:bg-blue-600 hover:text-white transition-colors cursor-help shadow-sm"
+            title={`参考原文编号: ${citeMatch[1]}`}
+          >
+            {citeMatch[1]}
+          </span>
+        );
+      }
+      return subPart;
+    });
+
+    if (isBold) {
       return (
-        <strong 
-          key={j} 
-          className="font-bold text-gray-900 bg-blue-50/50 px-1 rounded"
-        >
-          {innerText}
+        <strong key={j} className="font-bold text-gray-900 bg-blue-50/50 px-1 rounded">
+          {rendered}
         </strong>
       );
     }
-    return <span key={j}>{part}</span>;
+    return <span key={j}>{rendered}</span>;
   });
 };
 
@@ -255,8 +276,8 @@ const App: React.FC = () => {
               洞察全球，<br />
               掌握<span className="text-blue-600">即时动态</span>的热点。
             </h2>
-            <p className="text-gray-500 text-base sm:text-xl mb-8 sm:mb-12 max-w-2xl mx-auto">
-              即时获取 Google News 资讯，支持多阶段深度并发抓取。结合 Gemini AI 研判，为您提供专业的情报报告。
+            <p className="text-gray-500 text-base sm:text-xl mb-8 sm:mb-12 max-w-2xl mx-auto font-medium">
+              聚合全球实时新闻，通过 Gemini AI 进行深度研判与逻辑溯源，生成带有精准引用的分析报告。
             </p>
             
             <SearchBox 
@@ -412,8 +433,8 @@ const App: React.FC = () => {
                 {!state.isSummarizing && (
                   <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-[10px] sm:text-xs text-gray-400 font-medium">
                     <div className="flex items-center gap-3">
-                       <span className="bg-blue-50 text-blue-500 px-2 py-1 rounded">情报级</span>
-                       <span>本报告聚合了 {state.results.length} 篇相关领域权威新闻</span>
+                       <span className="bg-blue-50 text-blue-500 px-2 py-1 rounded">情报级分析</span>
+                       <span className="italic">点击报告中的引用编号可对照下方资讯列表</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span>引擎: Gemini 3 Flash-Preview</span>
@@ -440,7 +461,7 @@ const App: React.FC = () => {
                       <i className="fas fa-book-open text-blue-500"></i> 
                       参考资讯来源
                     </h3>
-                    <span className="text-xs text-gray-400 font-medium">按时间由新至旧排序</span>
+                    <span className="text-xs text-gray-400 font-medium">编号对应上方分析报告中的引用标签</span>
                   </div>
                   <NewsTable items={state.results} />
                 </div>
