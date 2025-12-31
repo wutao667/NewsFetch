@@ -20,85 +20,62 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
 
   return (
     <div className="space-y-4">
-      {/* 桌面端展示 (Table) */}
-      <div className="hidden md:block overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-100">
-        <table className="min-w-full divide-y divide-gray-100">
-          <thead className="bg-gray-50/50">
-            <tr>
-              <th scope="col" className="px-4 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-12">
-                #
-              </th>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">
-                新闻标题
-              </th>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-48">
-                发布时间
-              </th>
-              <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-400 uppercase tracking-wider w-32">
-                来源
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-50">
-            {items.map((item, index) => (
-              <tr 
-                key={index} 
-                id={`news-${index + 1}`}
-                className="hover:bg-blue-50/30 transition-colors group item-highlight"
-              >
-                <td className="px-4 py-5 text-sm font-bold text-blue-500/50">
-                   {index + 1}
-                </td>
-                <td className="px-6 py-5">
-                  <a 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="text-gray-900 font-semibold hover:text-blue-600 transition-colors line-clamp-2"
-                  >
-                    {item.title}
-                  </a>
-                </td>
-                <td className="px-6 py-5 text-sm text-gray-400 whitespace-nowrap">
-                  {item.pubDate}
-                </td>
-                <td className="px-6 py-5 text-sm">
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-[10px] font-black bg-gray-100 text-gray-600 uppercase tracking-tighter">
-                    {item.source}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 桌面端表头 - 仅在 md 及以上屏幕显示 */}
+      <div className="hidden md:grid grid-cols-[60px_1fr_180px_120px] gap-4 px-6 py-4 bg-gray-50/50 rounded-t-2xl border border-gray-100 border-b-0 text-xs font-bold text-gray-400 uppercase tracking-wider">
+        <span>#</span>
+        <span>新闻标题</span>
+        <span>发布时间</span>
+        <span>来源</span>
       </div>
 
-      {/* 移动端展示 (Card List) */}
-      <div className="md:hidden space-y-4">
+      {/* 统一列表容器 */}
+      <div className="flex flex-col gap-4 md:gap-0 md:border md:border-gray-100 md:rounded-b-2xl md:bg-white md:overflow-hidden md:divide-y md:divide-gray-50">
         {items.map((item, index) => (
           <div 
             key={index} 
             id={`news-${index + 1}`}
-            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3 item-highlight"
+            className="item-highlight bg-white md:bg-transparent p-5 md:px-6 md:py-4 rounded-2xl md:rounded-none shadow-sm md:shadow-none border border-gray-100 md:border-none relative transition-colors hover:bg-blue-50/30 group"
           >
-            <div className="absolute top-0 left-0 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-br-lg shadow-sm">
-              #{index + 1}
+            {/* 桌面端布局: Grid 模式 */}
+            <div className="hidden md:grid grid-cols-[60px_1fr_180px_120px] gap-4 items-center">
+              <span className="text-sm font-bold text-blue-500/50">{index + 1}</span>
+              <a 
+                href={item.link} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-gray-900 font-semibold hover:text-blue-600 transition-colors line-clamp-2"
+              >
+                {item.title}
+              </a>
+              <span className="text-sm text-gray-400 whitespace-nowrap">{item.pubDate}</span>
+              <div className="flex">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black bg-gray-100 text-gray-600 uppercase tracking-tighter">
+                  {item.source}
+                </span>
+              </div>
             </div>
-            <a 
-              href={item.link} 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="text-gray-900 font-bold text-base leading-snug hover:text-blue-600 active:text-blue-800 transition-colors line-clamp-3 pt-2"
-            >
-              {item.title}
-            </a>
-            <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-1">
-              <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase">
-                {item.source}
-              </span>
-              <span className="text-[10px] text-gray-400 font-medium">
-                {item.pubDate}
-              </span>
+
+            {/* 移动端布局: 卡片模式 */}
+            <div className="md:hidden flex flex-col gap-3">
+              <div className="absolute top-0 left-0 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-br-lg shadow-sm">
+                #{index + 1}
+              </div>
+              <a 
+                href={item.link} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-gray-900 font-bold text-base leading-snug hover:text-blue-600 active:text-blue-800 transition-colors line-clamp-3 pt-2"
+              >
+                {item.title}
+              </a>
+              <div className="flex items-center justify-between border-t border-gray-50 pt-3 mt-1">
+                <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-1 rounded uppercase">
+                  {item.source}
+                </span>
+                <span className="text-[10px] text-gray-400 font-medium">
+                  {item.pubDate}
+                </span>
+              </div>
             </div>
           </div>
         ))}

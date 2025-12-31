@@ -3,7 +3,7 @@
 <html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Gemini News Navigator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -11,24 +11,33 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
         html {
-            /* 全局滚动内边距补偿，确保锚点跳转时上方留出标题栏高度(约80px)外加呼吸感 */
-            scroll-padding-top: 120px;
+            /* 增加偏移量，确保在移动端也有足够的头部空间 */
+            scroll-padding-top: 100px;
+        }
+
+        @media (min-width: 768px) {
+            html {
+                scroll-padding-top: 130px;
+            }
         }
 
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* 跳转后的高亮动画：提醒用户当前位置 */
-        @keyframes highlight {
-            0% { background-color: rgba(59, 130, 246, 0.25); }
-            100% { background-color: transparent; }
+        /* 跳转后的高亮提示动画 */
+        @keyframes highlightPulse {
+            0% { background-color: rgba(59, 130, 246, 0.3); box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1); }
+            50% { background-color: rgba(59, 130, 246, 0.1); box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+            100% { background-color: transparent; box-shadow: none; }
         }
         
-        /* 当元素作为锚点目标被激活时触发动画 */
         .item-highlight:target {
-            animation: highlight 2.5s ease-out;
+            animation: highlightPulse 2s cubic-bezier(0.4, 0, 0.2, 1);
+            border-color: #3b82f6 !important;
+            z-index: 10;
         }
     </style>
 <script type="importmap">
@@ -44,7 +53,6 @@
 </head>
 <body>
     <div id="root"></div>
-    <!-- 显式引入 index.tsx -->
     <script type="module" src="index.tsx"></script>
 </body>
 </html>
