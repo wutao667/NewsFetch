@@ -16,7 +16,7 @@ function extract(str: string, regex: RegExp, index = 1) {
 }
 
 /**
- * 格式化日期为 YYYY-MM-DD
+ * 格式化日期为 YYYY-MM-DD，Google News RSS 搜索语法支持该格式
  */
 function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -63,33 +63,51 @@ export default async function handler(req: Request) {
 
   try {
     let items: any[] = [];
+    
+    // 解析时间范围参数
+    const timeRangeMatch = q.match(/when:(\w+)/);
+    const timeRange = timeRangeMatch ? timeRangeMatch[1] : null;
+    const baseQuery = q.replace(/when:\w+/, '').trim();
 
-    // 检测是否为 1 年模式 (前端传来的 query 包含 "when:1y")
-    if (q.includes('when:1y')) {
-      const baseQuery = q.replace('when:1y', '').trim();
+    if (timeRange && ['3d', '7d', '30d', '1y'].includes(timeRange)) {
+      // 定义拆分策略：[时间范围天数, 拆分段数]
+      const strategyMap: Record<string, [number, number]> = {
+        '3d': [3, 2],
+        '7d': [7, 2],
+        '30d': [30, 3],
+        '1y': [365, 6]
+      };
+
+      const [totalDays, segments] = strategyMap[timeRange];
+      const daysPerSegment = Math.ceil(totalDays / segments);
       
+      const fetchPromises = [];
       const now = new Date();
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(now.getMonth() - 6);
-      const oneYearAgo = new Date();
-      oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-      // 第一段：最近 6 个月 (after:半年前)
-      const q1 = `${baseQuery} after:${formatDate(sixMonthsAgo)}`;
-      const url1 = `https://news.google.com/rss/search?q=${encodeURIComponent(q1)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
-      
-      // 第二段：更早的 6 个月 (before:半年前 after:一年前)
-      const q2 = `${baseQuery} before:${formatDate(sixMonthsAgo)} after:${formatDate(oneYearAgo)}`;
-      const url2 = `https://news.google.com/rss/search?q=${encodeURIComponent(q2)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+      for (let i = 0; i < segments; i++) {
+        const end = new Date(now);
+        end.setDate(now.getDate() - (i * daysPerSegment));
+        
+        const start = new Date(now);
+        start.setDate(now.getDate() - ((i + 1) * daysPerSegment));
 
-      // 并发请求
-      const [results1, results2] = await Promise.all([
-        fetchRssItems(url1),
-        fetchRssItems(url2)
-      ]);
+        // 构造带日期范围的查询语句，例如: topic after:2023-01-01 before:2023-02-01
+        // 注意：第一段不需要 before，只需要 after 即可获取到最新
+        let segmentedQuery = baseQuery;
+        if (i === 0) {
+          segmentedQuery += ` after:${formatDate(start)}`;
+        } else {
+          segmentedQuery += ` after:${formatDate(start)} before:${formatDate(end)}`;
+        }
 
-      // 合并并去重 (根据 link)
-      const combined = [...results1, ...results2];
+        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(segmentedQuery)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+        fetchPromises.push(fetchRssItems(url));
+      }
+
+      const resultsArray = await Promise.all(fetchPromises);
+      const combined = resultsArray.flat();
+
+      // 根据链接去重
       const seen = new Set();
       items = combined.filter(item => {
         if (!item.link || seen.has(item.link)) return false;
@@ -97,13 +115,13 @@ export default async function handler(req: Request) {
         return true;
       });
     } else {
-      // 普通模式：单次请求
+      // 1d 或其他未定义范围：直接单次请求
       const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
       items = await fetchRssItems(rssUrl);
     }
 
-    // 最终返回结果，上限设为 300 以满足“拼接成 200 条以上”的需求
-    const finalItems = items.slice(0, 300);
+    // 最终截取数量上限调整为 600 条
+    const finalItems = items.slice(0, 600);
 
     return new Response(JSON.stringify(finalItems), {
       status: 200,
