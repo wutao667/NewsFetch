@@ -78,12 +78,9 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
         {items.map((item, index) => (
           <div 
             key={index} 
-            id={`news-mobile-${index + 1}`} // 移动端也添加 ID，虽 App.tsx 默认指向 news-n，但可以通用
+            id={`news-${index + 1}`}
             className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3 item-highlight"
           >
-            {/* 这里的 ID 设为 news-n 保证跳转一致性 */}
-            <div id={`news-${index + 1}`} className="absolute -top-20"></div> 
-            
             <div className="absolute top-0 left-0 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-br-lg shadow-sm">
               #{index + 1}
             </div>

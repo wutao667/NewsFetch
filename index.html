@@ -9,21 +9,26 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        html {
+            /* 全局滚动内边距补偿，确保锚点跳转时上方留出标题栏高度(约80px)外加呼吸感 */
+            scroll-padding-top: 120px;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
         }
-        /* 设置跳转偏移，避免被 sticky header 遮挡 */
-        [id^="news-"] {
-            scroll-margin-top: 100px;
-        }
-        /* 跳转后的高亮动画 */
+
+        /* 跳转后的高亮动画：提醒用户当前位置 */
         @keyframes highlight {
-            0% { background-color: rgba(59, 130, 246, 0.2); }
+            0% { background-color: rgba(59, 130, 246, 0.25); }
             100% { background-color: transparent; }
         }
+        
+        /* 当元素作为锚点目标被激活时触发动画 */
         .item-highlight:target {
-            animation: highlight 2s ease-out;
+            animation: highlight 2.5s ease-out;
         }
     </style>
 <script type="importmap">
