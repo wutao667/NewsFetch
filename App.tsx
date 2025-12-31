@@ -8,34 +8,56 @@ import { fetchGoogleNews } from './services/newsService';
 import { generateNewsSummary } from './services/geminiService';
 
 /**
- * 一个轻量级的组件，用于将 Markdown 格式（如 **bold**）转换为带有样式的 React 元素
+ * 增强型格式化组件：将 Markdown 符号转化为优雅的 UI 元素
  */
 const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
-  const paragraphs = text.split('\n');
+  const lines = text.split('\n');
 
   return (
-    <div className="space-y-4 text-gray-800 leading-relaxed text-base sm:text-lg">
-      {paragraphs.map((para, i) => {
-        if (!para.trim()) return <div key={i} className="h-2"></div>;
-        const parts = para.split(/(\*\*.*?\*\*)/g);
+    <div className="space-y-6 text-gray-800 leading-relaxed text-base sm:text-lg">
+      {lines.map((line, i) => {
+        const trimmedLine = line.trim();
         
+        // 1. 处理空行
+        if (!trimmedLine) return <div key={i} className="h-2"></div>;
+
+        // 2. 处理水平分隔线 (---)
+        if (trimmedLine === '---' || trimmedLine === '***' || trimmedLine === '___') {
+          return <hr key={i} className="my-8 border-t border-gray-100 bg-gradient-to-r from-transparent via-gray-200 to-transparent h-[1px] border-none" />;
+        }
+
+        // 3. 处理标题 (# ## ###)
+        const headingMatch = trimmedLine.match(/^(#{1,4})\s+(.*)/);
+        if (headingMatch) {
+          const level = headingMatch[1].length;
+          const content = headingMatch[2];
+          return (
+            <div key={i} className="pt-4 pb-2">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="h-6 w-1 bg-blue-600 rounded-full"></div>
+                <h3 className={`font-extrabold text-gray-900 ${level <= 2 ? 'text-xl sm:text-2xl' : 'text-lg sm:text-xl'}`}>
+                  {content}
+                </h3>
+              </div>
+            </div>
+          );
+        }
+
+        // 4. 处理无序列表 (- * +)
+        const listMatch = trimmedLine.match(/^[\-\*\+]\s+(.*)/);
+        if (listMatch) {
+          return (
+            <div key={i} className="flex gap-3 pl-2 sm:pl-4">
+              <span className="text-blue-500 mt-1.5">•</span>
+              <span>{renderBoldText(listMatch[1])}</span>
+            </div>
+          );
+        }
+
+        // 5. 处理普通段落与加粗内容
         return (
           <p key={i} className="relative">
-            {parts.map((part, j) => {
-              if (part.startsWith('**') && part.endsWith('**')) {
-                const innerText = part.slice(2, -2);
-                const isHeading = /核心总结|时间线|演变分析|关键趋势|总结|分析/.test(innerText);
-                return (
-                  <strong 
-                    key={j} 
-                    className={`${isHeading ? 'text-blue-700 font-extrabold block mb-1 text-lg sm:text-xl' : 'text-gray-900 font-bold'}`}
-                  >
-                    {innerText}
-                  </strong>
-                );
-              }
-              return <span key={j}>{part}</span>;
-            })}
+            {renderBoldText(line)}
           </p>
         );
       })}
@@ -43,11 +65,34 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+/**
+ * 辅助函数：渲染加粗文本
+ */
+const renderBoldText = (text: string) => {
+  const parts = text.split(/(\*\*.*?\*\*)/g);
+  return parts.map((part, j) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      const innerText = part.slice(2, -2);
+      // 如果加粗内容看起来像是一个小标题（单独占据一行且带冒号）
+      const isKeyPoint = innerText.includes('：') || innerText.length < 15;
+      return (
+        <strong 
+          key={j} 
+          className={`font-bold ${isKeyPoint ? 'text-blue-800' : 'text-gray-900'}`}
+        >
+          {innerText}
+        </strong>
+      );
+    }
+    return <span key={j}>{part}</span>;
+  });
+};
+
 const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
   const [history, setHistory] = useState<string[]>([]);
   
-  // 实时记录当前用户在界面上选中的时间范围（即使还未点击搜索按钮）
+  // 实时记录当前用户在界面上选中的时间范围
   const [activeTimeRange, setActiveTimeRange] = useState<TimeRange>('3d');
 
   const [state, setState] = useState<SearchState>({
@@ -108,7 +153,6 @@ const App: React.FC = () => {
   };
 
   const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
-    // 搜索时同步更新选中的时间范围
     setActiveTimeRange(timeRange);
     
     setState(prev => ({ 
@@ -269,7 +313,7 @@ const App: React.FC = () => {
 
         {view === 'results' && (
           <div className="max-w-5xl mx-auto space-y-6 sm:space-y-10 animate-in fade-in duration-500">
-            {/* 移动端搜索框 (仅在非桌面端显示) */}
+            {/* 移动端搜索框 */}
             <div className="lg:hidden w-full mb-4">
               <SearchBox 
                 onSearch={handleSearch} 
@@ -295,9 +339,9 @@ const App: React.FC = () => {
                     className="flex items-center gap-1.5 sm:gap-2 bg-white border border-gray-200 text-gray-700 px-3 sm:px-6 py-1.5 sm:py-3 rounded-lg sm:rounded-xl hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-70 shadow-sm text-xs sm:text-sm font-medium"
                   >
                     {state.isSummarizing ? (
-                      <><i className="fas fa-circle-notch fa-spin text-blue-500"></i> 处理中</>
+                      <><i className="fas fa-circle-notch fa-spin text-blue-500"></i> 分析中</>
                     ) : (
-                      <><i className="fas fa-sync-alt"></i> 重新总结</>
+                      <><i className="fas fa-sync-alt"></i> 重新分析</>
                     )}
                   </button>
                 )}
@@ -329,12 +373,6 @@ const App: React.FC = () => {
                   >
                     重试搜索
                   </button>
-                  <button 
-                    onClick={goBack}
-                    className="px-4 py-2 bg-white border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50 transition-colors"
-                  >
-                    更换关键词
-                  </button>
                 </div>
               </div>
             )}
@@ -347,10 +385,10 @@ const App: React.FC = () => {
                 <div className="flex items-center justify-between mb-5 sm:mb-8 relative z-10">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className={`p-1.5 sm:p-2 rounded-lg ${state.isSummarizing ? 'bg-gray-100' : 'bg-blue-100 text-blue-600'}`}>
-                      <i className={`fas fa-sparkles text-sm sm:text-base ${state.isSummarizing ? 'text-gray-400' : ''}`}></i> 
+                      <i className={`fas fa-wand-magic-sparkles text-sm sm:text-base ${state.isSummarizing ? 'text-gray-400' : ''}`}></i> 
                     </div>
                     <h3 className={`font-bold text-base sm:text-xl ${state.isSummarizing ? 'text-gray-400' : 'text-gray-900'}`}>
-                      {state.isSummarizing ? '正在深度分析...' : 'AI 洞察与舆论分析'}
+                      {state.isSummarizing ? '深度研判中...' : '深度情报分析报告'}
                     </h3>
                   </div>
                   {state.isSummarizing && (
@@ -363,7 +401,7 @@ const App: React.FC = () => {
                 </div>
                 
                 {state.summary ? (
-                  <div className="relative z-10">
+                  <div className="relative z-10 bg-[#fff] p-1 rounded-lg">
                     <FormattedSummary text={state.summary} />
                   </div>
                 ) : (
@@ -376,8 +414,11 @@ const App: React.FC = () => {
                 )}
                 
                 {!state.isSummarizing && (
-                  <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-50 flex items-center gap-2 text-[10px] sm:text-xs text-gray-400 font-medium italic">
-                    <i className="fas fa-info-circle"></i> 以上总结由 Gemini 3 模型基于新闻标题生成。
+                  <div className="mt-8 pt-6 border-t border-gray-50 flex items-center justify-between text-[10px] sm:text-xs text-gray-400">
+                    <div className="flex items-center gap-2 font-medium italic">
+                       <i className="fas fa-shield-halved"></i> 报告基于 {state.results.length} 篇权威新闻源综合生成
+                    </div>
+                    <span>Gemini 3 Flash</span>
                   </div>
                 )}
               </div>
@@ -395,7 +436,7 @@ const App: React.FC = () => {
               state.results.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg sm:text-xl font-bold text-gray-900 px-2 flex items-center gap-2">
-                    <i className="fas fa-list-ul text-blue-500 text-sm sm:text-base"></i> 原文列表
+                    <i className="fas fa-book-open text-blue-500 text-sm sm:text-base"></i> 参考资讯原文
                   </h3>
                   <NewsTable items={state.results} />
                 </div>
@@ -412,12 +453,12 @@ const App: React.FC = () => {
       {/* Footer */}
       <footer className="bg-white border-t border-gray-100 py-6 sm:py-10 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-4 text-center">
-          <p className="text-gray-400 text-xs sm:text-sm">© 2024 Gemini News Navigator. AI 总结由 Google Gemini 3 提供支持。</p>
+          <p className="text-gray-400 text-xs sm:text-sm">© 2024 Gemini News Navigator. 专业情报分析平台。</p>
           <button 
             onClick={openDebug}
             className="text-gray-300 hover:text-blue-500 transition-colors text-[10px] sm:text-xs flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-full"
           >
-            <i className="fas fa-bug"></i> 开发者诊断模式
+            <i className="fas fa-bug"></i> 开发者诊断
           </button>
         </div>
       </footer>
