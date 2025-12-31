@@ -15,6 +15,41 @@ function extract(str: string, regex: RegExp, index = 1) {
   return content.trim();
 }
 
+/**
+ * 格式化日期为 YYYY-MM-DD
+ */
+function formatDate(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * 抓取单个 RSS 源并解析
+ */
+async function fetchRssItems(url: string): Promise<any[]> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!response.ok) return [];
+
+    const xml = await response.text();
+    const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+    
+    return itemMatches.map(itemXml => ({
+      title: extract(itemXml, /<title>(.*?)<\/title>/),
+      link: extract(itemXml, /<link>(.*?)<\/link>/),
+      pubDate: extract(itemXml, /<pubDate>(.*?)<\/pubDate>/),
+      source: extract(itemXml, /<source[^>]*>(.*?)<\/source>/),
+    }));
+  } catch (e) {
+    console.error('RSS Fetch Error:', e);
+    return [];
+  }
+}
+
 export default async function handler(req: Request) {
   const { searchParams } = new URL(req.url);
   const q = searchParams.get('q');
@@ -26,40 +61,51 @@ export default async function handler(req: Request) {
     });
   }
 
-  // 构建 Google News RSS 搜索链接
-  const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
-
   try {
-    const response = await fetch(rssUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
-      }
-    });
+    let items: any[] = [];
 
-    if (!response.ok) {
-      return new Response(JSON.stringify({ error: `无法获取 RSS 订阅源: ${response.status}` }), {
-        status: response.status,
-        headers: { 'Content-Type': 'application/json' },
+    // 检测是否为 1 年模式 (前端传来的 query 包含 "when:1y")
+    if (q.includes('when:1y')) {
+      const baseQuery = q.replace('when:1y', '').trim();
+      
+      const now = new Date();
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(now.getMonth() - 6);
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+      // 第一段：最近 6 个月 (after:半年前)
+      const q1 = `${baseQuery} after:${formatDate(sixMonthsAgo)}`;
+      const url1 = `https://news.google.com/rss/search?q=${encodeURIComponent(q1)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+      
+      // 第二段：更早的 6 个月 (before:半年前 after:一年前)
+      const q2 = `${baseQuery} before:${formatDate(sixMonthsAgo)} after:${formatDate(oneYearAgo)}`;
+      const url2 = `https://news.google.com/rss/search?q=${encodeURIComponent(q2)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+
+      // 并发请求
+      const [results1, results2] = await Promise.all([
+        fetchRssItems(url1),
+        fetchRssItems(url2)
+      ]);
+
+      // 合并并去重 (根据 link)
+      const combined = [...results1, ...results2];
+      const seen = new Set();
+      items = combined.filter(item => {
+        if (!item.link || seen.has(item.link)) return false;
+        seen.add(item.link);
+        return true;
       });
+    } else {
+      // 普通模式：单次请求
+      const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=zh-CN&gl=CN&ceid=CN:zh-Hans`;
+      items = await fetchRssItems(rssUrl);
     }
 
-    const xml = await response.text();
-    
-    // 解析 XML 中的 <item> 块
-    const itemMatches = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-    
-    // 提取数据，将限制从 100 提高到 300
-    // 注意：Google News RSS 源本身返回的数量可能有限，通常在 100 条左右，
-    // 设置为 300 可以确保获取该源提供的所有可用结果。
-    const items = itemMatches.slice(0, 300).map(itemXml => {
-      const title = extract(itemXml, /<title>(.*?)<\/title>/);
-      const link = extract(itemXml, /<link>(.*?)<\/link>/);
-      const pubDate = extract(itemXml, /<pubDate>(.*?)<\/pubDate>/);
-      const source = extract(itemXml, /<source[^>]*>(.*?)<\/source>/);
-      return { title, link, pubDate, source };
-    });
+    // 最终返回结果，上限设为 300 以满足“拼接成 200 条以上”的需求
+    const finalItems = items.slice(0, 300);
 
-    return new Response(JSON.stringify(items), {
+    return new Response(JSON.stringify(finalItems), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
