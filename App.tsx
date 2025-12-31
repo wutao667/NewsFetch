@@ -8,7 +8,7 @@ import { fetchGoogleNews } from './services/newsService';
 import { generateNewsSummary } from './services/geminiService';
 
 /**
- * 极简美化版格式化组件：支持渲染 [n] 引用标签
+ * 极简美化版格式化组件：支持渲染 [n] 引用标签，并支持点击跳转
  */
 const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
   const lines = text.split('\n');
@@ -69,10 +69,9 @@ const FormattedSummary: React.FC<{ text: string }> = ({ text }) => {
 };
 
 /**
- * 辅助函数：渲染包含引用 [n] 和加粗的文本
+ * 辅助函数：渲染包含引用 [n] 和加粗的文本，将 [n] 转换为超链接
  */
 const renderTextWithCitations = (text: string) => {
-  // 1. 先按加粗切分
   const boldParts = text.split(/(\*\*.*?\*\*)/g);
   
   return boldParts.map((part, j) => {
@@ -84,19 +83,27 @@ const renderTextWithCitations = (text: string) => {
       isBold = true;
     }
 
-    // 2. 对切分后的每一部分进行引用识别 [n] 或 [n, m]
+    // 正则捕获：[1] 或 [1, 2]
     const citationParts = content.split(/(\[\d+(?:,\s*\d+)*\])/g);
     
     const rendered = citationParts.map((subPart, k) => {
       const citeMatch = subPart.match(/^\[(\d+(?:,\s*\d+)*)\]$/);
       if (citeMatch) {
+        // 如果有多个编号，如 [1, 2]，我们需要拆开分别做链接
+        const numbers = citeMatch[1].split(',').map(n => n.trim());
+        
         return (
-          <span 
-            key={k} 
-            className="inline-flex items-center justify-center mx-0.5 px-1.5 py-0 bg-blue-100 text-blue-700 text-[10px] sm:text-[12px] font-black rounded-sm align-top mt-1 hover:bg-blue-600 hover:text-white transition-colors cursor-help shadow-sm"
-            title={`参考原文编号: ${citeMatch[1]}`}
-          >
-            {citeMatch[1]}
+          <span key={k} className="inline-flex items-center gap-0.5 align-top mt-1 mx-0.5">
+            {numbers.map((num, idx) => (
+              <a 
+                key={idx}
+                href={`#news-${num}`}
+                className="inline-flex items-center justify-center px-1.5 py-0 bg-blue-100 text-blue-700 text-[10px] sm:text-[12px] font-black rounded-sm hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm hover:scale-110 active:scale-95 no-underline"
+                title={`跳转至原文编号: ${num}`}
+              >
+                {num}
+              </a>
+            ))}
           </span>
         );
       }

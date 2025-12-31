@@ -1,6 +1,6 @@
 
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,18 @@
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f8fafc;
+        }
+        /* 设置跳转偏移，避免被 sticky header 遮挡 */
+        [id^="news-"] {
+            scroll-margin-top: 100px;
+        }
+        /* 跳转后的高亮动画 */
+        @keyframes highlight {
+            0% { background-color: rgba(59, 130, 246, 0.2); }
+            100% { background-color: transparent; }
+        }
+        .item-highlight:target {
+            animation: highlight 2s ease-out;
         }
     </style>
 <script type="importmap">

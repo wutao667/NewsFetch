@@ -41,7 +41,11 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
           </thead>
           <tbody className="bg-white divide-y divide-gray-50">
             {items.map((item, index) => (
-              <tr key={index} className="hover:bg-blue-50/30 transition-colors group">
+              <tr 
+                key={index} 
+                id={`news-${index + 1}`}
+                className="hover:bg-blue-50/30 transition-colors group item-highlight"
+              >
                 <td className="px-4 py-5 text-sm font-bold text-blue-500/50">
                    {index + 1}
                 </td>
@@ -72,7 +76,14 @@ export const NewsTable: React.FC<NewsTableProps> = ({ items }) => {
       {/* 移动端展示 (Card List) */}
       <div className="md:hidden space-y-4">
         {items.map((item, index) => (
-          <div key={index} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3">
+          <div 
+            key={index} 
+            id={`news-mobile-${index + 1}`} // 移动端也添加 ID，虽 App.tsx 默认指向 news-n，但可以通用
+            className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden flex flex-col gap-3 item-highlight"
+          >
+            {/* 这里的 ID 设为 news-n 保证跳转一致性 */}
+            <div id={`news-${index + 1}`} className="absolute -top-20"></div> 
+            
             <div className="absolute top-0 left-0 bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-br-lg shadow-sm">
               #{index + 1}
             </div>
