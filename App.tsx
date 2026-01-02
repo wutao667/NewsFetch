@@ -125,6 +125,7 @@ const App: React.FC = () => {
   const [view, setView] = useState<View>('home');
   const [history, setHistory] = useState<string[]>([]);
   const [activeTimeRange, setActiveTimeRange] = useState<TimeRange>('3d');
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   const [state, setState] = useState<SearchState>({
     query: '',
@@ -135,6 +136,20 @@ const App: React.FC = () => {
     summary: null,
     isSummarizing: false,
   });
+
+  // 监听滚动位置，控制“回到顶部”按钮显示
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 400) {
+        setShowScrollTop(true);
+      } else {
+        setShowScrollTop(false);
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     const savedHistory = localStorage.getItem('gemini_news_history');
@@ -236,6 +251,13 @@ const App: React.FC = () => {
     } catch (err) {
       setState(prev => ({ ...prev, isSummarizing: false }));
     }
+  };
+
+  const scrollToTop = () => {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
 
   const goBack = () => {
@@ -481,6 +503,17 @@ const App: React.FC = () => {
           <DebugView onBack={goBack} />
         )}
       </main>
+
+      {/* 悬浮回到顶部按钮 */}
+      {view === 'results' && showScrollTop && (
+        <button
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 sm:bottom-10 sm:right-10 z-50 bg-blue-600 text-white w-12 h-12 sm:w-14 sm:h-14 rounded-full shadow-2xl flex items-center justify-center hover:bg-blue-700 active:scale-95 transition-all animate-in fade-in zoom-in duration-300"
+          aria-label="回到顶部"
+        >
+          <i className="fas fa-arrow-up text-lg sm:text-xl"></i>
+        </button>
+      )}
 
       <footer className="bg-white border-t border-gray-50 py-8 sm:py-12 mt-auto">
         <div className="max-w-7xl mx-auto px-4 flex flex-col items-center gap-6 text-center">
