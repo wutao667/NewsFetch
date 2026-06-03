@@ -23,9 +23,9 @@ export default async function handler(req: Request) {
       });
     }
 
-    const apiKey = process.env.API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: '服务器未配置 API_KEY 环境变量' }), {
+      return new Response(JSON.stringify({ error: '服务器未配置 GEMINI_API_KEY 环境变量' }), {
         status: 500,
         headers: { 'Content-Type': 'application/json' },
       });

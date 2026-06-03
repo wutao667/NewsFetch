@@ -129,7 +129,7 @@ export const DebugView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         </h4>
         <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
           <li><strong>安全说明：</strong>所有 API 请求现已通过 Vercel 后端中转，前端不再直接持有任何密钥。</li>
-          <li>如果 <strong>Gemini</strong> 失败，请检查 Vercel 项目设置中的 <code>API_KEY</code> 环境变量是否已添加并生效。</li>
+          <li>如果 <strong>Gemini</strong> 失败，请检查 Vercel 项目设置中的 <code>GEMINI_API_KEY</code> 环境变量是否已添加并生效。</li>
           <li>Edge Functions 可能有超时限制，复杂话题总结建议重试。</li>
         </ul>
       </div>
