@@ -15,6 +15,7 @@ export interface SearchState {
   isLoading: boolean;
   error: string | null;
   summary: string | null;
+  summaryError: string | null;
   isSummarizing: boolean;
 }
 

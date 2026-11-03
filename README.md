@@ -1,234 +1,122 @@
-# 📰 Gemini News Navigator
+# 📰 NewsFetch Navigator
 
-> 一个**高性能**的 AI 驱动新闻聚合 + 智能分析 Web 应用。从 **Google News RSS** 抓取最新新闻，用 **Google Gemini** 生成**带引用溯源**的专业研报式综述。
+一个基于 Google News RSS 的新闻聚合与 AI 研判应用。搜索完成后自动生成流式中文研报，每条关键论断以 `[n]` 标注来源，点击编号即可回到对应新闻。
 
-![Tech](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-6-646cff) ![Gemini](https://img.shields.io/badge/Gemini-3_Flash-4285f4) ![Edge](https://img.shields.io/badge/Vercel-Edge_Functions-000000)
+![Tech](https://img.shields.io/badge/React-19-61dafb) ![Vite](https://img.shields.io/badge/Vite-6-646cff) ![DeepSeek](https://img.shields.io/badge/DeepSeek-V4.1_Flash-4f46e5) ![Edge](https://img.shields.io/badge/Vercel-Edge_Functions-000000)
 
-## 📸 应用截图
+## 特性
 
-### 搜索结果 + AI 深度研判
+- 支持 1 天、3 天、7 天、30 天和 1 年五种新闻范围。
+- Google News RSS 分段抓取、排序、去重和清洗。
+- 搜索完成后自动调用 `deepseek-v4.1-flash` 生成五段式研报。
+- 研报以 SSE 流式显示，可随时停止并保留已生成正文。
+- 每条论断用 `[1]`、`[2, 5]` 等编号关联下方新闻来源。
+- AI API key 仅保存在 Vercel 服务端环境变量中，绝不进入仓库或浏览器。
+- 内置新闻代理与 AI 流式代理诊断面板。
 
-<div align="center">
-  <img src="docs/screenshots/mobile-results.png" width="320" alt="搜索结果与AI研判中" />
-</div>
+## 架构
 
-> 搜索"AI应用" + 3 天范围 → 聚合 **199 篇报道** → 点击 AI 研判，引用列表实时显示在下方。
-
-### 学术引用式 AI 研报
-
-<div align="center">
-  <img src="docs/screenshots/mobile-report.png" width="320" alt="AI研报输出" />
-</div>
-
-> AI 生成专业研报，每条论断带新闻编号（如 `[41]`、`[6, 37, 119]`），点击可跳转到对应新闻。
-
----
-
-## ✨ 特性
-
-- 🔍 **灵活搜索**：支持 1 天 / 3 天 / 7 天 / 30 天 / 1 年 五个时间范围
-- 📰 **新闻聚合**：从 Google News RSS 抓取，按时间排序，去重清洗
-- 🤖 **AI 深度综述**：用 Gemini 3 Flash 生成**学术引用式**分析报告
-- 📎 **引用溯源**：AI 输出的每条论断都标注**新闻来源编号** `[1] [2, 5]`，可点击跳转
-- 📱 **响应式**：桌面端表格视图，移动端卡片视图
-- 🛡️ **安全架构**：所有 API 调用走 Vercel Edge Function 代理，**API Key 不暴露前端**
-- 🔧 **诊断面板**：内置 API 健康检查界面
-
----
-
-## 🏗️ 架构
-
-```
-┌─────────────────────────────────────────┐
-│  Frontend (React 19 + Vite 6)           │
-│  ┌───────────┐ ┌───────────┐ ┌────────┐ │
-│  │ SearchBox │ │NewsTable  │ │  Debug │ │
-│  └───────────┘ └───────────┘ └────────┘ │
-│         │           ▲             │      │
-│  ┌──────▼──────────┴─────────────▼──┐  │
-│  │   services/ (fetch wrapper)      │  │
-│  └────────────┬──────────────┬───────┘  │
-└───────────────┼──────────────┼─────────┘
-                │              │
-       /api/news (edge)   /api/gemini (edge)
-                │              │
-       Google News RSS    @google/genai
-       (time segmented)   (gemini-3-flash)
+```text
+┌────────────────────────────────────────────┐
+│ Browser: React 19 + Vite 6                 │
+│ SearchBox → App → Summary/NewsTable/Debug  │
+└──────────────┬────────────────┬────────────┘
+               │                │
+       GET /api/news    POST /api/summarize (SSE)
+               │                │
+       Google News RSS  Vercel Edge Function
+                                │ native fetch
+                                ▼
+                   opencode-go chat/completions
+                   model: deepseek-v4.1-flash
 ```
 
----
+浏览器只请求本站 `/api/summarize`。Edge Function 从环境变量读取密钥、校验并裁剪输入、构造隔离资料区的提示词，再把上游 OpenAI 兼容 SSE 规范化为本站的 `delta`、`done`、`error` 三种事件。推理字段不会进入最终研报。
 
-## 🚀 Vercel 部署（推荐 ⭐ 5 分钟搞定）
+## Vercel 部署
 
-> **你只需要一个 `GEMINI_API_KEY`**。前端和后端用同一份 Vercel 部署。
+1. 在 opencode 申请可访问 opencode-go 的 API key。
+2. 将仓库导入 Vercel。
+3. 在 **Settings → Environment Variables** 添加 `OPENCODE_API_KEY`；密钥只配置在 Vercel，绝不提交到仓库。
+4. 使用默认构建命令 `vite build`、输出目录 `dist` 部署。
+5. 部署后打开诊断面板验证 `/api/news` 和 `/api/summarize`，再搜索一个话题确认自动研判与引用跳转。
 
-### 步骤 1：导入项目
+### 环境变量
 
-1. 登录 [vercel.com](https://vercel.com)
-2. **Add New → Project → Import** `wutao667/NewsFetch`
-3. 同意 Vercel 访问你的 GitHub 仓库授权
+| 变量 | 必填 | 默认值 | 说明 |
+|---|---:|---|---|
+| `OPENCODE_API_KEY` | 是 | 无 | opencode-go API key；缺失时代理返回 `missing_api_key` |
+| `OPENCODE_BASE_URL` | 否 | `https://opencode.ai/zen/go/v1/chat/completions` | OpenAI 兼容的聊天补全端点 |
+| `OPENCODE_MODEL` | 否 | `deepseek-v4.1-flash` | 上游模型名 |
+| `OPENCODE_MAX_TOKENS` | 否 | `51200` | 最大输出 token 数 |
+| `OPENCODE_CONTEXT_WINDOW` | 否 | `1048576` | 发送给上游的上下文窗口参数 |
+| `SUMMARY_MAX_NEWS` | 否 | `150` | 单次进入研报资料区的新闻上限 |
+| `SUMMARY_TIMEOUT_MS` | 否 | `240000` | 上游请求与流式生成超时，单位毫秒 |
 
-> 💡 **如果想 fork 到自己账号再部署**：在 GitHub 上打开 https://github.com/wutao667/NewsFetch，点 **Fork**，然后在 Vercel 里选 fork 后的仓库即可。两种方式效果一样。
+## 本地开发
 
-### 步骤 2：配置环境变量
-
-在 Vercel 项目设置里：
-
-1. 进入项目 → **Settings** → **Environment Variables**
-2. 添加：
-   | Name | Value |
-   |------|-------|
-   | `GEMINI_API_KEY` | `AIzaSy...` 你的 Gemini API Key |
-
-> 💡 **获取 Gemini API Key**：访问 [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey) 免费申请（Google 账号即可）
-
-3. **Environment**：选 `Production`（或全部勾选）
-
-### 步骤 3：部署
-
-1. Vercel 会自动检测 Vite 项目
-2. **Build Command**：`vite build`（自动识别）
-3. **Output Directory**：`dist`（自动识别）
-4. 点击 **Deploy** 🚀
-
-约 1-2 分钟后部署完成，会得到一个 `xxx.vercel.app` 的地址。
-
-### 步骤 4：验证
-
-1. 打开你的 Vercel 域名
-2. 搜索任意话题（例如"AI"）
-3. 等待新闻列表 → 点击 **AI 总结** 按钮
-4. 应该能看到带 `[1] [2, 3]` 引用的分析报告 ✅
-
-如果失败：进入项目 → 顶部菜单的 **Diagnostics**，点"开始测试"看是哪个 API 出问题。
-
----
-
-## 💻 本地开发
-
-**前置**：Node.js 18+
+前置要求：Node.js 18+。
 
 ```bash
-# 1. 克隆
-git clone https://github.com/wutao667/NewsFetch.git
-cd NewsFetch
-
-# 2. 安装依赖
 npm install
-
-# 3. 配置环境变量
-echo "GEMINI_API_KEY=你的_key" > .env.local
-
-# 4. 启动开发服务器
 npm run dev
 ```
 
-打开 http://localhost:3000
-
-> **注意**：本地运行时，Vite 会把 `/api/*` 自动代理到 Vercel 路径，需要用 `vercel dev` 或者在 `vite.config.ts` 里加代理配置才能本地调用 Edge Function。
-
-### 本地跑 Edge Function
+Vite 开发服务器本身不会运行 `api/*.ts`。完整本地联调应使用 `vercel dev` 并在本地环境中设置 `OPENCODE_API_KEY`。任何 `.env.local` 都不得提交。
 
 ```bash
-# 安装 Vercel CLI
-npm i -g vercel
-
-# 本地跑（会读取 .env.local）
-vercel dev
+npx vercel dev
 ```
 
----
+## 流式输出
 
-## 📁 项目结构
+`/api/summarize` 请求上游时使用 `stream: true`，将 OpenAI 兼容 SSE 转成稳定的站内事件：
 
+```text
+data: {"type":"delta","text":"..."}
+
+data: {"type":"done"}
 ```
+
+上游流开始后的错误会成为 `type: "error"` 事件；流开始前的认证、限流和超时错误则使用结构化 JSON 与对应 HTTP 状态返回。前端逐段追加正文，停止生成时通过 `AbortController` 取消请求并保留当前文本。
+
+## 为什么从 Gemini 换成 DeepSeek V4.1 Flash
+
+这是一次 AI 供应链迁移：历史版本使用 Gemini 与专用 SDK；当前版本改为 opencode-go 的 OpenAI 兼容接口和 `deepseek-v4.1-flash`。原生 `fetch` 消除了供应商 SDK 依赖，后端代理继续保护密钥，SSE 则让长研报在生成期间即可阅读和停止。迁移后的模型、token 上限、上下文窗口与端点均可通过 Vercel 环境变量调整。
+
+## 项目结构
+
+```text
 NewsFetch/
-├── api/                          # Vercel Edge Functions
-│   ├── news.ts                  # Google News RSS 抓取 + 时间分段
-│   └── gemini.ts                # Gemini AI 综述生成
-├── services/                    # 前端 API 封装
+├── api/
+│   ├── news.ts                 # Google News RSS 抓取与时间分段
+│   ├── resolve-news.ts         # 新闻真实链接解析
+│   └── summarize.ts            # opencode-go 流式代理
+├── services/
 │   ├── newsService.ts
-│   └── geminiService.ts
-├── components/                  # React 组件
-│   ├── SearchBox.tsx           # 搜索框 + 时间范围
-│   ├── NewsTable.tsx           # 桌面/移动响应式列表
-│   └── DebugView.tsx           # API 诊断面板
-├── App.tsx                      # 主应用
-├── index.tsx                    # 入口（含错误捕获）
-├── index.html                   # HTML 模板（importmap）
-├── types.ts                     # TypeScript 类型定义
-├── vite.config.ts
-├── tsconfig.json
+│   └── summaryService.ts       # 浏览器 SSE 客户端
+├── components/
+│   ├── SearchBox.tsx
+│   ├── NewsTable.tsx
+│   └── DebugView.tsx
+├── scripts/test-summarize.mjs  # 代理契约测试
+├── App.tsx
+├── types.ts
 └── package.json
 ```
 
----
-
-## 🔑 关键实现
-
-### 时间分段抓取（`api/news.ts`）
-
-不是一次拉完 RSS，而是**按时间段切片并发**：
-
-| 时间范围 | 分段数 | 每段天数 |
-|---------|--------|---------|
-| 1 天 | 1 | 1 |
-| 3 天 | 2 | 2 |
-| 7 天 | 2 | 4 |
-| 30 天 | 3 | 10 |
-| 1 年 | 6 | ~60 |
-
-每段用 `after:YYYY-MM-DD before:YYYY-MM-DD` 精确定位，最后 `Promise.all` 合并 + `Set` 去重。
-
-### 学术引用 Prompt（`api/gemini.ts`）
-
-```typescript
-const prompt = `
-请针对"${topic}"话题，基于以下新闻数据进行深度综述。
-
-新闻列表：
-${newsContent}  // 已编号 [1] [2] [3]...
-
-报告结构：
-1. 核心态势总结
-2. 详尽时间线演变
-3. 多维度深度剖析
-4. 不同声音与立场
-5. 未来趋势预判
-
-【引用规范】每条论断必须标注新闻编号，例如 [1] 或 [2, 5, 12]
-`;
-```
-
-`systemInstruction` 强调"严谨溯源，像学术论文"。
-
----
-
-## 🛠️ 技术栈
+## 技术栈
 
 | 层 | 技术 |
-|----|------|
-| 前端框架 | React 19 |
-| 构建工具 | Vite 6 |
-| 语言 | TypeScript 5.8 |
-| 样式 | Tailwind CSS（CDN）|
-| 图标 | Font Awesome 6 |
-| 后端 | Vercel Edge Functions（Web 标准 Fetch API）|
-| AI | Google Gemini 3 Flash（`@google/genai` v1.34）|
+|---|---|
+| 前端 | React 19、TypeScript 5.8 |
+| 构建 | Vite 6 |
+| 样式与图标 | Tailwind CSS CDN、Font Awesome 6 |
+| 后端 | Vercel Edge Functions、Web Streams API |
+| AI | opencode-go / `deepseek-v4.1-flash` |
+| AI 客户端 | 原生 `fetch`，无 SDK |
 | 数据源 | Google News RSS |
 
----
-
-## ⚙️ 环境变量
-
-| 变量 | 必填 | 说明 |
-|------|------|------|
-| `GEMINI_API_KEY` | ✅ 是 | Google Gemini API Key，部署到 Vercel 必须设置 |
-
-本地开发可选放在 `.env.local`（已在 `.gitignore`）。
-
----
-
-## 📜 License
+## License
 
 MIT

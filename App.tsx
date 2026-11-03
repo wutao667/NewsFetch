@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchBox } from './components/SearchBox';
 import { NewsTable } from './components/NewsTable';
 import { DebugView } from './components/DebugView';
 import { SearchState, View, TimeRange } from './types';
 import { fetchGoogleNews } from './services/newsService';
-import { generateNewsSummary } from './services/geminiService';
+import { streamSummary, SummaryError } from './services/summaryService';
 
 /**
  * 极简美化版格式化组件：支持渲染 [n] 引用标签，并支持点击跳转
@@ -126,6 +126,7 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [activeTimeRange, setActiveTimeRange] = useState<TimeRange>('3d');
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [state, setState] = useState<SearchState>({
     query: '',
@@ -134,6 +135,7 @@ const App: React.FC = () => {
     isLoading: false,
     error: null,
     summary: null,
+    summaryError: null,
     isSummarizing: false,
   });
 
@@ -152,7 +154,7 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem('gemini_news_history');
+    const savedHistory = localStorage.getItem('newsfetch_history');
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory));
@@ -166,7 +168,7 @@ const App: React.FC = () => {
     setHistory(prev => {
       const filtered = prev.filter(q => q !== query);
       const newHistory = [query, ...filtered].slice(0, 10);
-      localStorage.setItem('gemini_news_history', JSON.stringify(newHistory));
+      localStorage.setItem('newsfetch_history', JSON.stringify(newHistory));
       return newHistory;
     });
   };
@@ -174,7 +176,7 @@ const App: React.FC = () => {
   const deleteFromHistory = (query: string) => {
     setHistory(prev => {
       const newHistory = prev.filter(q => q !== query);
-      localStorage.setItem('gemini_news_history', JSON.stringify(newHistory));
+      localStorage.setItem('newsfetch_history', JSON.stringify(newHistory));
       return newHistory;
     });
   };
@@ -182,7 +184,7 @@ const App: React.FC = () => {
   const clearHistory = () => {
     if (window.confirm('确定要清空所有搜索历史吗？')) {
       setHistory([]);
-      localStorage.removeItem('gemini_news_history');
+      localStorage.removeItem('newsfetch_history');
     }
   };
 
@@ -198,6 +200,8 @@ const App: React.FC = () => {
   };
 
   const handleSearch = useCallback(async (query: string, timeRange: TimeRange) => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setActiveTimeRange(timeRange);
     
     setState(prev => ({ 
@@ -206,7 +210,9 @@ const App: React.FC = () => {
       timeRange, 
       isLoading: true, 
       error: null, 
-      summary: null 
+      summary: null,
+      summaryError: null,
+      isSummarizing: false,
     }));
     setView('results');
     saveToHistory(query);
@@ -222,13 +228,34 @@ const App: React.FC = () => {
       }));
 
       if (news.length > 0) {
-        setState(prev => ({ ...prev, isSummarizing: true }));
+        const controller = new AbortController();
+        abortRef.current = controller;
+        setState(prev => ({ ...prev, isSummarizing: true, summary: '', summaryError: null }));
         try {
-          const summaryText = await generateNewsSummary(news, query);
-          setState(prev => ({ ...prev, summary: summaryText, isSummarizing: false }));
-        } catch (summaryErr) {
-          console.error("Auto-summarize failed:", summaryErr);
-          setState(prev => ({ ...prev, isSummarizing: false }));
+          const summaryText = await streamSummary(news, query, {
+            signal: controller.signal,
+            onDelta: text => {
+              if (abortRef.current !== controller) return;
+              setState(prev => ({ ...prev, summary: `${prev.summary || ''}${text}` }));
+            },
+          });
+          if (abortRef.current === controller) {
+            setState(prev => ({ ...prev, summary: summaryText, isSummarizing: false }));
+          }
+        } catch (summaryErr: unknown) {
+          if (summaryErr instanceof Error && summaryErr.name === 'AbortError') return;
+          console.error('Auto-summarize failed:', summaryErr);
+          if (abortRef.current === controller) {
+            const code = summaryErr instanceof SummaryError ? summaryErr.code : 'unknown_error';
+            const message = summaryErr instanceof Error ? summaryErr.message : '未知错误';
+            setState(prev => ({
+              ...prev,
+              isSummarizing: false,
+              summaryError: `AI 研判失败（${code}）：${message}`,
+            }));
+          }
+        } finally {
+          if (abortRef.current === controller) abortRef.current = null;
         }
       }
     } catch (err: any) {
@@ -241,16 +268,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleSummarize = async () => {
-    if (state.results.length === 0) return;
-    
-    setState(prev => ({ ...prev, isSummarizing: true, summary: null }));
-    try {
-      const summaryText = await generateNewsSummary(state.results, state.query);
-      setState(prev => ({ ...prev, summary: summaryText, isSummarizing: false }));
-    } catch (err) {
-      setState(prev => ({ ...prev, isSummarizing: false }));
-    }
+  const stopSummary = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setState(prev => ({ ...prev, isSummarizing: false }));
   };
 
   const scrollToTop = () => {
@@ -261,8 +282,10 @@ const App: React.FC = () => {
   };
 
   const goBack = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
     setView('home');
-    setState(prev => ({ ...prev, results: [], error: null, summary: null }));
+    setState(prev => ({ ...prev, results: [], error: null, summary: null, summaryError: null, isSummarizing: false }));
   };
 
   const openDebug = () => {
@@ -281,7 +304,7 @@ const App: React.FC = () => {
               <i className="fas fa-bolt text-white text-xs sm:text-base"></i>
             </div>
             <h1 className="text-lg sm:text-xl font-bold text-gray-900 tracking-tight">
-              Gemini News <span className="hidden sm:inline text-blue-600">Navigator</span>
+              NewsFetch <span className="hidden sm:inline text-blue-600">Navigator</span>
             </h1>
           </div>
           {view === 'results' && (
@@ -306,7 +329,7 @@ const App: React.FC = () => {
               掌握<span className="text-blue-600">即时动态</span>的热点。
             </h2>
             <p className="text-gray-500 text-base sm:text-xl mb-8 sm:mb-12 max-w-2xl mx-auto font-medium">
-              聚合全球实时新闻，通过 Gemini AI 进行深度研判与逻辑溯源，生成带有精准引用的分析报告。
+              聚合全球实时新闻，通过 DeepSeek V4.1 Flash 进行深度研判与逻辑溯源，生成带有精准引用的分析报告。
             </p>
             
             <SearchBox 
@@ -371,26 +394,13 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center">
                 <button 
                   onClick={goBack}
                   className="inline-flex items-center text-blue-600 hover:text-blue-800 font-medium transition-colors group text-sm sm:text-base"
                 >
                   <i className="fas fa-arrow-left mr-2 group-hover:-translate-x-1 transition-transform"></i> 返回
                 </button>
-                {!state.isLoading && state.results.length > 0 && (
-                  <button
-                    onClick={handleSummarize}
-                    disabled={state.isSummarizing}
-                    className="flex items-center gap-1.5 sm:gap-2 bg-white border border-gray-200 text-gray-700 px-3 sm:px-6 py-1.5 sm:py-3 rounded-lg sm:rounded-xl hover:bg-gray-50 transition-all active:scale-95 disabled:opacity-70 shadow-sm text-xs sm:text-sm font-medium"
-                  >
-                    {state.isSummarizing ? (
-                      <><i className="fas fa-circle-notch fa-spin text-blue-500"></i> 分析中</>
-                    ) : (
-                      <><i className="fas fa-sync-alt"></i> 重新研判</>
-                    )}
-                  </button>
-                )}
               </div>
               
               <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
@@ -421,8 +431,8 @@ const App: React.FC = () => {
               </div>
             )}
 
-            {(state.isSummarizing || state.summary) && (
-              <div className={`relative p-5 sm:p-10 rounded-3xl border transition-all duration-700 overflow-hidden ${state.isSummarizing ? 'bg-white border-gray-100 shadow-sm animate-pulse' : 'bg-white border-blue-50 shadow-2xl shadow-blue-900/5'}`}>
+            {(state.isSummarizing || state.summary || state.summaryError) && (
+              <div className={`relative p-5 sm:p-10 rounded-3xl border transition-all duration-700 overflow-hidden ${state.isSummarizing ? 'bg-white border-gray-100 shadow-sm' : 'bg-white border-blue-50 shadow-2xl shadow-blue-900/5'}`}>
                 <div className={`absolute left-0 top-0 bottom-0 w-1 ${state.isSummarizing ? 'bg-gray-200' : 'bg-blue-600'}`}></div>
                 
                 <div className="flex items-center justify-between mb-8 sm:mb-12 relative z-10">
@@ -438,35 +448,45 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   {state.isSummarizing && (
-                    <div className="flex gap-2">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '200ms' }}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '400ms' }}></div>
-                    </div>
+                    <button
+                      onClick={stopSummary}
+                      className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 transition-colors hover:bg-red-100"
+                    >
+                      <i className="fas fa-stop"></i> 停止生成
+                    </button>
                   )}
                 </div>
+
+                {state.summaryError && (
+                  <div className="relative z-10 mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    <div className="mb-1 font-bold"><i className="fas fa-exclamation-circle mr-2"></i>研判未完成</div>
+                    <p>{state.summaryError}</p>
+                  </div>
+                )}
                 
                 {state.summary ? (
                   <div className="relative z-10 antialiased">
                     <FormattedSummary text={state.summary} />
                   </div>
-                ) : (
+                ) : state.isSummarizing ? (
                   <div className="space-y-6">
                     <div className="h-5 bg-gray-50 rounded-full w-full"></div>
                     <div className="h-5 bg-gray-50 rounded-full w-[94%]"></div>
                     <div className="h-5 bg-gray-50 rounded-full w-[97%]"></div>
                     <div className="h-5 bg-gray-50 rounded-full w-[88%]"></div>
                   </div>
+                ) : (
+                  <p className="relative z-10 text-sm text-gray-500">本次研判未生成正文。</p>
                 )}
                 
-                {!state.isSummarizing && (
+                {!state.isSummarizing && state.summary && (
                   <div className="mt-12 pt-8 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-[10px] sm:text-xs text-gray-400 font-medium">
                     <div className="flex items-center gap-3">
                        <span className="bg-blue-50 text-blue-500 px-2 py-1 rounded">情报级分析</span>
                        <span className="italic">点击报告中的引用编号可对照下方资讯列表</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span>引擎: Gemini 3 Flash-Preview</span>
+                      <span>引擎: opencode-go / deepseek-v4.1-flash</span>
                       <i className="fas fa-check-circle text-green-500"></i>
                     </div>
                   </div>
@@ -523,8 +543,8 @@ const App: React.FC = () => {
             <i className="fas fa-rss text-2xl"></i>
           </div>
           <p className="text-gray-400 text-xs sm:text-sm font-medium tracking-wide">
-            © 2024 Gemini News Navigator. <br className="sm:hidden" />
-            基于 Google News RSS 与 Google GenAI 深度驱动
+            © 2024 NewsFetch Navigator. <br className="sm:hidden" />
+            基于 Google News RSS 与 DeepSeek V4.1 Flash 深度驱动
           </p>
           <button 
             onClick={openDebug}
